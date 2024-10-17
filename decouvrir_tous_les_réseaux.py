@@ -53,15 +53,7 @@ def parse_output(output):
         # ssids = re.findall(r'SSID\s\d+\s:\s([^\r\n]+)', out, re.DOTALL) 
 
         networks = list(zip(ssids, signals))
-        
-        if networks:
-            strongest_network = max(networks, key=lambda x: int(x[1]))
-            strongest_ssid, strongest_signal = strongest_network
-            
-            return strongest_ssid, strongest_signal
-        else:
-            print('Pas de points d\'accès disponibles.')
-            return None, None 
+        return networks
 
     else:
         raise Exception('Unsupported OS')
@@ -89,15 +81,28 @@ def connect_to_strongest_wifi(ssid, signal):
 def display_wifi_info():
     while True:
         output = read_from_cmd()
-        ssid, signal = parse_output(output)
+        networks = parse_output(output)
         
-        if ssid is None:
+        print('\n***********************\n')
+            
+        if len(networks) == 0 :
             print("Pas de points d\'accès.")
-        else:
-            print(f"SSID du meilleur point d\'accès: {ssid}")
-            print(f"Signal du meilleur point d\'accès: {signal}%")
-            connect_to_strongest_wifi(ssid, signal)
-            print('\n***********************\n')
+            return;
+        
+        print('Points \'accès disponibles :')
+        for i, network in enumerate(networks):
+            print(f"{i + 1}. SSID: {network[0]}, Signal: {network[1]}%")
+            
+        print('')
+        
+        
+        strongest_network = max(networks, key=lambda x: int(x[1]))
+        ssid, signal = strongest_network
+        
+        print(f"SSID du meilleur point d\'accès: {ssid}")
+        print(f"Signal du meilleur point d\'accès: {signal}%")
+        connect_to_strongest_wifi(ssid, signal)
+        
         
         time.sleep(5)
 
