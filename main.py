@@ -19,19 +19,29 @@ def get_signal_strength():
         return int(matches[0][1]) if matches else None
     elif platform.system() == 'Windows':
         matches = re.findall('Signal.*?:.*?([0-9]*)%', output, re.DOTALL)
-        return (int(matches[0]) / 100 * 100) if matches else None
+        if matches:
+            percent = int(matches[0])
+            return percent_to_dBm(percent)
+        return None
     else:
         raise Exception('Unsupported OS')
+
+def percent_to_dBm(percent):
+    PdBm_max = 0 
+    PdBm_min = -100
+    dBm = PdBm_max - ((PdBm_max - PdBm_min) * (100 - percent) / 100)
+
+    return dBm
 
 signal_strength_values = []
 
 figure, axe = plot.subplots()
 line_plot, = axe.plot([], [], lw=2)
 axe.set_xlim(0, 100)
-axe.set_ylim(0, 100)
-axe.set_xlabel('Time (s)')
-axe.set_ylabel('Signal Strength (dBm)')
-axe.set_title('Signal Strength Monitoring of Access Point')
+axe.set_ylim(-100, 0)
+axe.set_xlabel('Temps (s)')
+axe.set_ylabel('Puissance du signal (dBm)')
+axe.set_title("Puissance du signal d'un point d'accès")
 
 try:
     while True:
