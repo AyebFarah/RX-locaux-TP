@@ -5,74 +5,105 @@ import platform
 import matplotlib.pyplot as plot
 import numpy as np
 
+
 def read_from_cmd():
     if platform.system() == 'Linux':
         process = subprocess.Popen("nmcli dev wifi list", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     elif platform.system() == 'Windows':
         process = subprocess.Popen("netsh wlan show networks mode=bssid", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     else:
-        raise Exception('Unsupported OS')
+        raise Exception('Unspoorted OS')
 
     output, error = process.communicate()
     output = output.decode('latin-1')
     return output
 
+
 def parse_output(output):
     if platform.system() == 'Linux':
-        networks = output.splitlines()[1:]  # Ignore header
-        strongest_signal = -100  # Very low signal
+        networks = output.splitlines()[1:]
+        strongest_signal = -100
         strongest_ssid = None
 
         for line in networks:
-            if line.strip():  # Ignore empty lines
+            if line.strip():
                 parts = re.split(r'\s{2,}', line.strip())
-                if len(parts) > 5:  # Ensure there are enough parts
+                if len(parts) > 5:
                     ssid = parts[0]
-                    signal = int(parts[5])  # Signal strength is in the 6th column
+                    signal = int(parts[5])
 
                     if signal > strongest_signal:
                         strongest_signal = signal
                         strongest_ssid = ssid
 
         return strongest_ssid, strongest_signal
+    
+    
     elif platform.system() == 'Windows':
-        networks = []
+        signals = re.findall(r'Signal\s*:\s*(\d+)%', output)
+        
+        ssids = []
         for line in output.splitlines():
             if 'SSID' in line:
-                ssid = line.split(':')[1].strip()
-                signal_line = next((l for l in output.splitlines() if 'Signal' in l and ssid in l), None)
-                if signal_line:
-                    signal_match = re.search(r'(\d+)%', signal_line)
-                    if signal_match:
-                        signal = int(signal_match.group(1))
-                    else:
-                        signal = 0  # default signal strength if not found
-                else:
-                    signal = 0  # default signal strength if not found
-                networks.append((ssid, signal))
+                cleaned_line = re.sub(r'[^\x20-\x7E]', '', line).strip()
+                if cleaned_line.startswith('SSID'):
+                    ssid = cleaned_line.split(':')[1].strip()
+                    ssids.append(ssid)
+                    
+        # ssids = re.findall(r'SSID\s\d+\s:\s([^\r\n]+)', out, re.DOTALL) 
 
-        strongest_ssid = max(networks, key=lambda x: x[1])[0]
-        strongest_signal = max(networks, key=lambda x: x[1])[1]
+        networks = list(zip(ssids, signals))
+        
+        if networks:
+            strongest_network = max(networks, key=lambda x: int(x[1]))
+            strongest_ssid, strongest_signal = strongest_network
+            
+            return strongest_ssid, strongest_signal
+        else:
+            print('Pas de points d\'accès disponibles.')
+            return None, None 
 
-        return strongest_ssid, strongest_signal
     else:
         raise Exception('Unsupported OS')
+
+
 
 def connect_to_strongest_wifi(ssid, signal):
     if platform.system() == 'Linux':
-        subprocess.run(["nmcli", "dev", "wifi", "connect", ssid])
+        command = ["nmcli", "dev", "wifi", "connect", ssid]
     elif platform.system() == 'Windows':
-        subprocess.run(["netsh", "wlan", "connect", ssid])
+        command = ["netsh", "wlan", "connect", ssid]
     else:
         raise Exception('Unsupported OS')
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate()
+
+    if process.returncode == 0:
+        print(f"Connecté à : {ssid}")
+    else:
+        print(f"Erreur de connection à {ssid}. Erreur rencontrée: {error.decode('latin-1')}")
+
+
 
 def display_wifi_info():
     while True:
         output = read_from_cmd()
         ssid, signal = parse_output(output)
-        print(f"Strongest WiFi: {ssid} with signal strength {signal}dBm")
-        connect_to_strongest_wifi(ssid, signal)
+        
+        if ssid is None:
+            print("Pas de points d\'accès.")
+        else:
+            print(f"SSID du meilleur point d\'accès: {ssid}")
+            print(f"Signal du meilleur point d\'accès: {signal}%")
+            connect_to_strongest_wifi(ssid, signal)
+            print('\n***********************\n')
+        
         time.sleep(5)
+
 
 if __name__ == "__main__":
     display_wifi_info()
+
+    
+    
